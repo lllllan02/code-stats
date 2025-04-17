@@ -147,6 +147,12 @@ func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*Directory
 	}
 
 	res.CalculateAvg()
+	for _, lang := range res.LanguageStats {
+		lang.CalculateAvg()
+	}
+	for _, ext := range res.ExtensionStats {
+		ext.CalculateAvg()
+	}
 	return res, nil
 }
 

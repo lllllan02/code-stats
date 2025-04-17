@@ -26,6 +26,14 @@ var (
 
 	// 是否开启详细日志
 	verboseFlag = flag.Bool("verbose", false, "Show verbose output")
+
+	// 报告相关选项
+	showFilesFlag = flag.Bool("show-files", false, "Show individual files in report")
+	topNFlag      = flag.Int("top", 10, "Show top N files in report")
+	outputFlag    = flag.String("output", "code-stats-report.html", "Output file path for the report")
+
+	// 帮助信息
+	helpFlag = flag.Bool("help", false, "Show help message")
 )
 
 func init() {
@@ -33,7 +41,31 @@ func init() {
 	analyzer.Verbose = *verboseFlag
 }
 
+// 打印使用说明
+func printUsage() {
+	fmt.Println("代码统计工具 - 分析代码行数、注释比例等指标")
+	fmt.Println("\n使用方法:")
+	fmt.Println("  code-stats [选项]")
+	fmt.Println("\n选项:")
+	flag.PrintDefaults()
+	fmt.Println("\n示例:")
+	fmt.Println("  # 分析当前目录")
+	fmt.Println("  code-stats")
+	fmt.Println("\n  # 分析指定目录并排除node_modules")
+	fmt.Println("  code-stats -path=/path/to/code -exclude-dirs=node_modules,vendor")
+	fmt.Println("\n  # 生成报告并保存到指定文件")
+	fmt.Println("  code-stats -output=report.html -show-files")
+	fmt.Println("\n  # 只显示前20个最大的文件")
+	fmt.Println("  code-stats -show-files -top=20")
+}
+
 func main() {
+	// 如果指定了帮助参数，则显示使用说明并退出
+	if *helpFlag {
+		printUsage()
+		return
+	}
+
 	analyzer.PrintInfo("开始分析目录: %s", *pathFlag)
 
 	options := analyzer.DefaultOptions()
@@ -46,7 +78,7 @@ func main() {
 		options.ExcludeExt = strings.Split(*excludeExtsFlag, ",")
 	}
 
-	_, err := analyzer.AnalyzeDirectory(*pathFlag, options)
+	stats, err := analyzer.AnalyzeDirectory(*pathFlag, options)
 	fmt.Println()
 	if err != nil {
 		analyzer.PrintError("分析失败: %v", err)
@@ -54,4 +86,25 @@ func main() {
 	}
 
 	analyzer.PrintInfo("分析完成!")
+
+	// 设置报告选项
+	reportOptions := analyzer.DefaultReportOptions()
+	reportOptions.ShowFiles = *showFilesFlag
+	reportOptions.TopN = *topNFlag
+	reportOptions.OutputFile = *outputFlag
+
+	// 生成HTML报告
+	report, err := analyzer.GenerateReport(stats, reportOptions)
+	if err != nil {
+		analyzer.PrintError("生成报告失败: %v", err)
+		return
+	}
+
+	// 保存报告到文件
+	if err := analyzer.SaveReportToFile(report, reportOptions.OutputFile); err != nil {
+		analyzer.PrintError("保存报告失败: %v", err)
+		return
+	}
+
+	analyzer.PrintInfo("报告已生成: %s", reportOptions.OutputFile)
 }
