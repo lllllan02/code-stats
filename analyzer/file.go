@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -38,7 +37,7 @@ func AnalyzeFile(path string) (*FileStats, error) {
 func (f *FileStats) analyzeSize(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
-		fmt.Printf("获取文件 %s 大小失败: %v\n", path, err)
+		PrintError("无法获取文件大小: %s (%v)", path, err)
 		return err
 	}
 	f.TotalSize = info.Size()
@@ -51,7 +50,7 @@ func (f *FileStats) analyzeFile(path string) error {
 
 	file, err := os.Open(path)
 	if err != nil {
-		fmt.Printf("打开文件 %s 失败: %v\n", path, err)
+		PrintError("无法打开文件: %s (%v)", path, err)
 		return err
 	}
 	defer file.Close()
