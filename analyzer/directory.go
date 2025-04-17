@@ -138,14 +138,14 @@ func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*Directory
 		// 语言统计
 		lang := fs.Language
 		if _, exists := res.LanguageStats[lang]; !exists {
-			res.LanguageStats[lang] = &LanguageStats{Stat: &Stat{}, Language: lang}
+			res.LanguageStats[lang] = &Stat{}
 		}
 		res.LanguageStats[lang].Merge(fs.Stat)
 
 		// 文件扩展名统计
 		ext := strings.ToLower(filepath.Ext(fs.Path))
 		if _, exists := res.ExtensionStats[ext]; !exists {
-			res.ExtensionStats[ext] = &ExtensionStats{Stat: &Stat{}, Extension: ext}
+			res.ExtensionStats[ext] = &Stat{}
 		}
 		res.ExtensionStats[ext].Merge(fs.Stat)
 	}

@@ -1,7 +1,3 @@
 package analyzer
 
-type ExtensionStats struct {
-	*Stat
-
-	Extension string
-}
+type ExtensionStats = Stat

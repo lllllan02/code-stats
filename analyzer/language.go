@@ -6,11 +6,7 @@ import (
 )
 
 // LanguageStats 存储每种语言的统计信息
-type LanguageStats struct {
-	*Stat
-
-	Language string // 语言
-}
+type LanguageStats = Stat
 
 // GetLanguageByExt 根据文件扩展名确定编程语言
 func GetLanguageByExt(filename string) string {
