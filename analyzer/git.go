@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -54,16 +55,30 @@ func AnalyzeGitRepo(repoPath string) (*GitStats, error) {
 		BranchList:      make(map[string]bool),
 	}
 
+	PrintInfo("开始分析Git仓库...")
+	// 分析步骤总数
+	totalSteps := 6
+	currentStep := 0
+
+	// 获取全局进度条
+	progressBar := GetGlobalProgressBar(totalSteps, "Git仓库分析")
+
 	// 检查是否是 Git 仓库
 	if !isGitRepo(repoPath) {
 		PrintWarning("目录不是 Git 仓库: %s", repoPath)
 		return stats, nil
 	}
 
+	currentStep++
+	progressBar.Set(currentStep)
+
 	// 获取提交数量
 	if count, err := getCommitCount(repoPath); err == nil {
 		stats.CommitCount = count
 	}
+
+	currentStep++
+	progressBar.Set(currentStep)
 
 	// 获取贡献者数量和贡献者统计
 	if contributors, err := getContributors(repoPath); err == nil {
@@ -71,11 +86,11 @@ func AnalyzeGitRepo(repoPath string) (*GitStats, error) {
 		stats.TopContributors = contributors
 	}
 
-	// 获取贡献者详细统计信息
-	if err := getDetailedContributorStats(repoPath, stats); err == nil {
-		// 贡献者数量可能会在详细分析中更准确，再次更新
-		stats.ContributorCount = len(stats.Contributors)
-	}
+	currentStep++
+	progressBar.Set(currentStep)
+
+	currentStep++
+	progressBar.Set(currentStep)
 
 	// 获取提交时间范围
 	if first, last, activeDays, err := getCommitTimeStats(repoPath); err == nil {
@@ -84,6 +99,9 @@ func AnalyzeGitRepo(repoPath string) (*GitStats, error) {
 		stats.ActiveDays = activeDays
 	}
 
+	currentStep++
+	progressBar.Set(currentStep)
+
 	// 获取文件变更统计
 	if additions, deletions, fileChanges, err := getChangeStats(repoPath); err == nil {
 		stats.TotalAdditions = additions
@@ -91,10 +109,24 @@ func AnalyzeGitRepo(repoPath string) (*GitStats, error) {
 		stats.TotalFileChanges = fileChanges
 	}
 
+	currentStep++
+	progressBar.Set(currentStep)
+
 	// 获取分支统计
 	if branches, count, err := getBranchStats(repoPath); err == nil {
 		stats.BranchCount = count
 		stats.BranchList = branches
+	}
+
+	// 完成进度条
+	progressBar.Finish()
+	fmt.Println()
+	PrintInfo("Git仓库分析完成")
+
+	// 获取贡献者详细统计信息
+	if err := getDetailedContributorStats(repoPath, stats); err == nil {
+		// 贡献者数量可能会在详细分析中更准确，再次更新
+		stats.ContributorCount = len(stats.Contributors)
 	}
 
 	return stats, nil
@@ -138,7 +170,18 @@ func getDetailedContributorStats(path string, stats *GitStats) error {
 	}
 
 	// 获取每个贡献者的提交统计
+	totalContributors := len(stats.Contributors)
+	currentContributor := 0
+	PrintInfo("开始分析 %d 位贡献者的详细统计信息", totalContributors)
+
+	// 获取贡献者分析进度条
+	contributorProgressBar := GetGlobalProgressBar(totalContributors, "贡献者分析")
+	contributorProgressBar.Set(currentContributor)
+
 	for email, contributor := range stats.Contributors {
+		currentContributor++
+		contributorProgressBar.Set(currentContributor)
+
 		// 获取提交次数
 		countCmd := exec.Command("git", "-C", path, "log", "--author="+email, "--pretty=format:%H", "--all")
 		var countOut bytes.Buffer
@@ -183,12 +226,10 @@ func getDetailedContributorStats(path string, stats *GitStats) error {
 					// 最早的提交
 					firstTimestamp := timestamps[0]
 					contributor.FirstCommit = time.Unix(firstTimestamp, 0)
-					PrintInfo("贡献者 %s 的首次提交日期: %s", email, contributor.FirstCommit.Format("2006-01-02"))
 
 					// 最近的提交
 					lastTimestamp := timestamps[len(timestamps)-1]
 					contributor.LastCommit = time.Unix(lastTimestamp, 0)
-					PrintInfo("贡献者 %s 的最后提交日期: %s", email, contributor.LastCommit.Format("2006-01-02"))
 
 					// 如果只有一次提交，首次和最后提交日期将相同
 					if len(timestamps) == 1 {
@@ -282,6 +323,10 @@ func getDetailedContributorStats(path string, stats *GitStats) error {
 		}
 	}
 
+	// 完成贡献者分析进度条
+	contributorProgressBar.Finish()
+	fmt.Println()
+	PrintInfo("贡献者详细分析完成")
 	return nil
 }
 
