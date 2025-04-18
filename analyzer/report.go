@@ -26,6 +26,17 @@ type ReportData struct {
 	SortedExts     []ExtensionItem
 	FilesBySize    []*FileStats
 	FilesByLines   []*FileStats
+
+	// Git 相关数据
+	HasGitStats       bool              // 是否有 Git 统计信息
+	TopContributors   []ContributorItem // 排名前N的贡献者
+	ContributorsLimit int               // 贡献者数量限制
+}
+
+// ContributorItem 表示UI显示用的贡献者项
+type ContributorItem struct {
+	Name        string
+	CommitCount int
 }
 
 // DefaultReportData 返回默认的报告数据
@@ -34,7 +45,8 @@ func DefaultReportData(stats *DirectoryStats) ReportData {
 		Stats:          stats,
 		OutputFile:     "code-stats-report.html",
 		GenerationTime: time.Now().Format("2006-01-02 15:04:05"),
-		TopN:           20, // 默认显示20个文件
+		TopN:           20,                    // 默认显示20个文件
+		HasGitStats:    stats.GitStats != nil, // 是否有 Git 统计信息
 	}
 }
 
@@ -78,7 +90,16 @@ func GenerateHTMLReport(data ReportData) string {
 		"subtract": func(a, b int) int {
 			return a - b
 		},
+		"add": func(a, b int) int {
+			return a + b
+		},
 		"ext": filepath.Ext,
+		"formatTime": func(t time.Time) string {
+			if t.IsZero() {
+				return "N/A"
+			}
+			return t.Format("2006-01-02 15:04:05")
+		},
 	}
 
 	// 确保GenerationTime字段已设置
@@ -151,6 +172,31 @@ func GenerateHTMLReport(data ReportData) string {
 		}
 		data.FilesByLines = filesByLines[:limit]
 		data.FileLinesLimit = limit
+	}
+
+	// 处理 Git 数据
+	if stats.GitStats != nil {
+		data.HasGitStats = true
+
+		// 处理贡献者数据
+		if len(stats.GitStats.TopContributors) > 0 {
+			contributors := make([]ContributorItem, 0, len(stats.GitStats.TopContributors))
+			for name, count := range stats.GitStats.TopContributors {
+				contributors = append(contributors, ContributorItem{name, count})
+			}
+			// 按提交数排序
+			sort.Slice(contributors, func(i, j int) bool {
+				return contributors[i].CommitCount > contributors[j].CommitCount
+			})
+
+			// 取前 N 个贡献者
+			limit := data.TopN
+			if limit > len(contributors) {
+				limit = len(contributors)
+			}
+			data.TopContributors = contributors[:limit]
+			data.ContributorsLimit = limit
+		}
 	}
 
 	// 解析并执行模板

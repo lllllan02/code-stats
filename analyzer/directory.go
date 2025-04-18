@@ -26,6 +26,7 @@ type DirectoryStats struct {
 	FileStats      []*FileStats
 	LanguageStats  map[string]*LanguageStats
 	ExtensionStats map[string]*ExtensionStats
+	GitStats       *GitStats // Git 仓库统计信息
 }
 
 func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*DirectoryStats, error) {
@@ -43,6 +44,15 @@ func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*Directory
 		return res, fmt.Errorf("目录不存在: %s", path)
 	} else if !info.IsDir() {
 		return res, fmt.Errorf("不是目录: %s", path)
+	}
+
+	// 始终分析 Git 仓库信息，忽略选项设置
+	PrintInfo("开始分析 Git 仓库信息...")
+	gitStats, err := AnalyzeGitRepo(path)
+	if err != nil {
+		PrintWarning("Git 仓库分析失败: %v", err)
+	} else {
+		res.GitStats = gitStats
 	}
 
 	// 遍历目录
@@ -140,14 +150,14 @@ func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*Directory
 		// 语言统计
 		lang := fs.Language
 		if _, exists := res.LanguageStats[lang]; !exists {
-			res.LanguageStats[lang] = &Stat{}
+			res.LanguageStats[lang] = &LanguageStats{}
 		}
 		res.LanguageStats[lang].Merge(fs.Stat)
 
 		// 文件扩展名统计
 		ext := strings.ToLower(filepath.Ext(fs.Path))
 		if _, exists := res.ExtensionStats[ext]; !exists {
-			res.ExtensionStats[ext] = &Stat{}
+			res.ExtensionStats[ext] = &ExtensionStats{}
 		}
 		res.ExtensionStats[ext].Merge(fs.Stat)
 	}

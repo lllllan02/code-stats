@@ -133,24 +133,30 @@
         }
         .file-browser-container {
             display: flex;
+            flex-direction: row;
             background-color: #fff;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             margin-bottom: 30px;
+            min-height: 500px;
+            max-height: 700px;
+            overflow: hidden;
         }
         
         .directory-tree {
             width: 30%;
+            min-width: 250px;
             padding: 15px;
             border-right: 1px solid #eee;
             overflow: auto;
-            max-height: 600px;
+            height: 100%;
         }
         
         .file-details {
             width: 70%;
             padding: 20px;
             overflow: auto;
+            height: 100%;
         }
         
         /* 目录树样式 */
@@ -165,6 +171,10 @@
         
         .treeview li {
             margin: 5px 0;
+        }
+        
+        .directory-item {
+            position: relative;
         }
         
         .treeview .directory {
@@ -316,6 +326,9 @@
         <div class="nav-item" data-target="section-extensions">扩展名统计</div>
         <div class="nav-item" data-target="section-files-size">最大文件</div>
         <div class="nav-item" data-target="section-files-lines">最长文件</div>
+        {{if .HasGitStats}}
+        <div class="nav-item" data-target="section-git-stats">Git 统计</div>
+        {{end}}
         <div class="nav-item" data-target="section-file-browser">文件浏览器</div>
     </div>
 
@@ -348,6 +361,64 @@
             </div>
         </div>
     </div>
+
+    <!-- Git 统计区域 -->
+    {{if .HasGitStats}}
+    <div id="section-git-stats" class="section">
+        <div class="summary">
+            <h3>Git 仓库基本信息</h3>
+            <div class="summary-item"><span class="summary-label">提交总数:</span> {{.Stats.GitStats.CommitCount}} 次提交</div>
+            <div class="summary-item"><span class="summary-label">贡献者数量:</span> {{.Stats.GitStats.ContributorCount}} 人</div>
+            <div class="summary-item"><span class="summary-label">首次提交时间:</span> {{formatTime .Stats.GitStats.FirstCommitDate}}</div>
+            <div class="summary-item"><span class="summary-label">最后提交时间:</span> {{formatTime .Stats.GitStats.LastCommitDate}}</div>
+            <div class="summary-item"><span class="summary-label">活跃天数:</span> {{.Stats.GitStats.ActiveDays}} 天</div>
+            <div class="summary-item"><span class="summary-label">添加的行数总计:</span> {{.Stats.GitStats.TotalAdditions}} 行</div>
+            <div class="summary-item"><span class="summary-label">删除的行数总计:</span> {{.Stats.GitStats.TotalDeletions}} 行</div>
+            <div class="summary-item"><span class="summary-label">文件变更总数:</span> {{.Stats.GitStats.TotalFileChanges}} 个</div>
+            <div class="summary-item"><span class="summary-label">分支数量:</span> {{.Stats.GitStats.BranchCount}} 个</div>
+        </div>
+
+        {{if .TopContributors}}
+        <h3>贡献者排行 (前 {{.ContributorsLimit}} 名)</h3>
+        <table id="contributors-table" class="display">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>贡献者</th>
+                    <th>提交数</th>
+                    <th>占比</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $index, $contributor := .TopContributors}}
+                <tr>
+                    <td>{{add $index 1}}</td>
+                    <td>{{$contributor.Name}}</td>
+                    <td>{{$contributor.CommitCount}}</td>
+                    <td>{{printf "%.1f%%" (multiply (divideBy $contributor.CommitCount $.Stats.GitStats.CommitCount) 100)}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{end}}
+
+        <!-- Git 统计可视化 -->
+        <div class="chart-container">
+            <div class="chart">
+                <h3>贡献者分布</h3>
+                <div style="position: relative; height: 200px;">
+                    <canvas id="contributorsChart"></canvas>
+                </div>
+            </div>
+            <div class="chart">
+                <h3>提交活跃度</h3>
+                <div style="position: relative; height: 200px;">
+                    <canvas id="commitActivityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{end}}
 
     <!-- 语言统计区域 -->
     <div id="section-languages" class="section">
@@ -469,10 +540,14 @@
 
     <!-- 文件浏览器区域 -->
     <div id="section-file-browser" class="section">
-        <p>点击目录树中的文件可查看详细信息</p>
+        <div class="summary">
+            <h3>文件浏览器</h3>
+            <p>点击目录树中的文件可查看详细信息</p>
+        </div>
         
         <div class="file-browser-container">
             <div class="directory-tree">
+                <h4 style="margin-top: 0; color: #3498db;">文件结构</h4>
                 <div class="treeview" id="fileTree"></div>
             </div>
             <div class="file-details" id="fileDetails">
@@ -488,15 +563,20 @@
         // 初始化所有DataTable
         $(document).ready(function() {
             // 为所有table.display表格启用DataTables排序功能
-            $('table.display:not(#files-dashboard)').DataTable({
-                paging: false,
-                searching: false,
-                info: false,
-                order: [],  // 保持默认排序
-                stripeClasses: [],  // 禁用交替行类
-                rowCallback: function(row, data) {
-                    // 为表格行添加统一样式
-                    $(row).addClass('unified-row');
+            // 使用 $.fn.dataTable.isDataTable 检查表格是否已经初始化
+            $('table.display:not(#files-dashboard)').each(function() {
+                if (!$.fn.dataTable.isDataTable(this)) {
+                    $(this).DataTable({
+                        paging: false,
+                        searching: false,
+                        info: false,
+                        order: [],  // 保持默认排序
+                        stripeClasses: [],  // 禁用交替行类
+                        rowCallback: function(row, data) {
+                            // 为表格行添加统一样式
+                            $(row).addClass('unified-row');
+                        }
+                    });
                 }
             });
             
@@ -514,6 +594,13 @@
                 $('.section').removeClass('active');
                 // 显示目标部分
                 $('#' + targetId).addClass('active');
+                
+                // 如果切换到Git统计页面，重新初始化图表
+                if (targetId === 'section-git-stats') {
+                    setTimeout(function() {
+                        initGitCharts();
+                    }, 100);
+                }
             });
         });
         
@@ -603,7 +690,10 @@
             
             // 处理每个文件路径
             Object.keys(fileData).forEach(path => {
-                const parts = path.split("/");
+                // 统一路径分隔符，处理 Windows 和 UNIX 路径
+                const normalizedPath = path.replace(/\\/g, '/');
+                const parts = normalizedPath.split('/').filter(p => p.length > 0);
+                
                 let current = root;
                 
                 // 逐级创建目录结构
@@ -733,45 +823,58 @@
             
             document.getElementById('fileDetails').innerHTML = html;
             
-            // 绘制饼图
-            const ctx = document.getElementById('fileCompositionChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: ['代码行', '注释行', '空白行'],
-                    datasets: [{
-                        data: [file.codeLines, file.commentLines, file.blankLines],
-                        backgroundColor: [
-                            'rgba(54, 162, 235, 0.7)',
-                            'rgba(255, 205, 86, 0.7)',
-                            'rgba(201, 203, 207, 0.7)'
-                        ],
-                        borderColor: [
-                            'rgb(54, 162, 235)',
-                            'rgb(255, 205, 86)',
-                            'rgb(201, 203, 207)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                        },
-                        title: {
-                            display: true,
-                            text: '文件组成'
-                        }
+            // 绘制饼图前先检查并销毁已有图表
+            setTimeout(function() {
+                const chartEl = document.getElementById('fileCompositionChart');
+                if (chartEl) {
+                    // 销毁已存在的图表实例
+                    const existingChart = Chart.getChart(chartEl);
+                    if (existingChart) {
+                        existingChart.destroy();
                     }
+                    
+                    // 绘制新饼图
+                    const ctx = chartEl.getContext('2d');
+                    new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: ['代码行', '注释行', '空白行'],
+                            datasets: [{
+                                data: [file.codeLines, file.commentLines, file.blankLines],
+                                backgroundColor: [
+                                    'rgba(54, 162, 235, 0.7)',
+                                    'rgba(255, 205, 86, 0.7)',
+                                    'rgba(201, 203, 207, 0.7)'
+                                ],
+                                borderColor: [
+                                    'rgb(54, 162, 235)',
+                                    'rgb(255, 205, 86)',
+                                    'rgb(201, 203, 207)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                },
+                                title: {
+                                    display: true,
+                                    text: '文件组成'
+                                }
+                            }
+                        }
+                    });
                 }
-            });
+            }, 0);
         }
         
         // 当文档加载完成时初始化目录树
         $(document).ready(function() {
+            // 初始化文件树
             const tree = buildDirectoryTree();
             document.getElementById('fileTree').innerHTML = renderDirectoryTree(tree);
             
@@ -789,7 +892,148 @@
             
             // 默认展开根目录
             $('#fileTree > ul > li').addClass('expanded').removeClass('collapsed');
+            
+            // 初始化文件详情区域
+            $('.file-details').html('<div class="no-file-selected"><p>请从左侧目录树中选择一个文件查看详情</p></div>');
+            
+            // 为贡献者表格初始化 DataTable - 避免重复初始化
+            if (document.getElementById('contributors-table') && !$.fn.dataTable.isDataTable('#contributors-table')) {
+                $('#contributors-table').DataTable({
+                    paging: false,
+                    searching: false,
+                    info: false,
+                    order: [],
+                    stripeClasses: []
+                });
+            }
+            
+            // 初始化Git统计图表
+            initGitCharts();
+            
+            // 页面加载完成后，再次尝试初始化文件浏览器
+            // 这是为了解决某些浏览器中文件树不显示的问题
+            setTimeout(function() {
+                if ($('#fileTree').children().length === 0) {
+                    console.log('重试初始化文件树...');
+                    document.getElementById('fileTree').innerHTML = renderDirectoryTree(buildDirectoryTree());
+                    $('#fileTree > ul > li').addClass('expanded').removeClass('collapsed');
+                }
+                
+                // 确保文件浏览器区域在切换时正确显示
+                $('.nav-item[data-target="section-file-browser"]').on('click', function() {
+                    setTimeout(function() {
+                        if ($('#fileTree').children().length === 0) {
+                            document.getElementById('fileTree').innerHTML = renderDirectoryTree(buildDirectoryTree());
+                            $('#fileTree > ul > li').addClass('expanded').removeClass('collapsed');
+                        }
+                    }, 100);
+                });
+            }, 500);
         });
+        
+        // 初始化Git统计图表
+        function initGitCharts() {
+            {{if .HasGitStats}}
+            // 检查图表元素是否存在
+            const contributorsChartEl = document.getElementById('contributorsChart');
+            const commitActivityChartEl = document.getElementById('commitActivityChart');
+            
+            // 销毁已存在的图表实例，避免重复初始化
+            if (contributorsChartEl) {
+                const existingChart = Chart.getChart(contributorsChartEl);
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+                
+                // 贡献者分布图
+                const contributorsCtx = contributorsChartEl.getContext('2d');
+                new Chart(contributorsCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: [{{range $i, $contributor := .TopContributors}}{{if $i}}, {{end}}'{{$contributor.Name}}'{{end}}],
+                        datasets: [{
+                            data: [{{range $i, $contributor := .TopContributors}}{{if $i}}, {{end}}{{$contributor.CommitCount}}{{end}}],
+                            backgroundColor: [
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 99, 132, 0.7)',
+                                'rgba(255, 205, 86, 0.7)',
+                                'rgba(75, 192, 192, 0.7)',
+                                'rgba(153, 102, 255, 0.7)',
+                                'rgba(255, 159, 64, 0.7)',
+                                'rgba(199, 199, 199, 0.7)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    boxWidth: 12
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            if (commitActivityChartEl) {
+                const existingChart = Chart.getChart(commitActivityChartEl);
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+                
+                // 添加/删除行统计图
+                const activityCtx = commitActivityChartEl.getContext('2d');
+                new Chart(activityCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['代码变更'],
+                        datasets: [
+                            {
+                                label: '添加行数',
+                                data: [{{.Stats.GitStats.TotalAdditions}}],
+                                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                                borderColor: 'rgb(75, 192, 192)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: '删除行数',
+                                data: [{{.Stats.GitStats.TotalDeletions}}],
+                                backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                                borderColor: 'rgb(255, 99, 132)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.raw + ' 行';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+            {{end}}
+        }
     </script>
 </body>
 </html>
