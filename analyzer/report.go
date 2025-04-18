@@ -420,8 +420,8 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
     <script>
         // 初始化所有DataTable
         $(document).ready(function() {
-            // 为所有表格启用DataTables排序功能
-            $('table.display').DataTable({
+            // 为所有table.display表格启用DataTables排序功能
+            $('table.display:not(#files-dashboard)').DataTable({
                 paging: false,
                 searching: false,
                 info: false,
@@ -535,6 +535,389 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
                     }
                 }
             }
+        });
+    </script>
+
+    <h2>文件浏览器</h2>
+    <p>点击目录树中的文件可查看详细信息</p>
+    
+    <style>
+        .file-browser-container {
+            display: flex;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .directory-tree {
+            width: 30%;
+            padding: 15px;
+            border-right: 1px solid #eee;
+            overflow: auto;
+            max-height: 600px;
+        }
+        
+        .file-details {
+            width: 70%;
+            padding: 20px;
+            overflow: auto;
+        }
+        
+        /* 目录树样式 */
+        .treeview {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .treeview ul {
+            list-style: none;
+            padding-left: 20px;
+        }
+        
+        .treeview li {
+            margin: 5px 0;
+        }
+        
+        .treeview .directory {
+            cursor: pointer;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .treeview .file {
+            cursor: pointer;
+            color: #3498db;
+        }
+        
+        .treeview .file:hover {
+            text-decoration: underline;
+        }
+        
+        .treeview .collapsed > ul {
+            display: none;
+        }
+        
+        .treeview .expanded > ul {
+            display: block;
+        }
+        
+        .treeview .directory:before {
+            content: "📁 ";
+        }
+        
+        .treeview .expanded > .directory:before {
+            content: "📂 ";
+        }
+        
+        .treeview .file:before {
+            content: "📄 ";
+        }
+        
+        /* 文件详情样式 */
+        .file-details h3 {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        
+        .file-details .info-group {
+            margin-bottom: 15px;
+        }
+        
+        .file-details .info-label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .file-details .metrics {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .file-details .metric-box {
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px 15px;
+            margin: 0 10px 10px 0;
+            width: calc(33.33% - 10px);
+            box-sizing: border-box;
+        }
+        
+        .file-details .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .file-details .metric-name {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        .file-mini-chart {
+            margin-top: 20px;
+            height: 200px;
+        }
+        
+        .no-file-selected {
+            color: #7f8c8d;
+            font-style: italic;
+            text-align: center;
+            margin-top: 40px;
+        }
+    </style>
+    
+    <div class="file-browser-container">
+        <div class="directory-tree">
+            <div class="treeview" id="fileTree"></div>
+        </div>
+        <div class="file-details" id="fileDetails">
+            <div class="no-file-selected">
+                <p>请从左侧目录树中选择一个文件查看详情</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 文件数据
+        const fileData = {
+`)
+
+	// 创建文件数据对象，用于JavaScript处理
+	for i, f := range stats.FileStats {
+		ext := filepath.Ext(f.Path)
+		if ext == "" {
+			ext = "(无扩展名)"
+		}
+
+		ratio := float64(0)
+		if f.CodeLines > 0 {
+			ratio = float64(f.CommentLines) / float64(f.CodeLines)
+		}
+
+		lang := f.Language
+		if lang == "" {
+			lang = "未识别"
+		}
+
+		// 创建JSON对象
+		sb.WriteString(fmt.Sprintf(`            "%s": {
+                path: "%s",
+                language: "%s",
+                extension: "%s",
+                size: %.2f,
+                totalLines: %d,
+                codeLines: %d,
+                commentLines: %d,
+                blankLines: %d,
+                commentRatio: %.2f,
+                avgLineLength: %.1f
+            }`, f.Path, f.Path, lang, ext, float64(f.TotalSize)/1024, f.TotalLines, f.CodeLines, f.CommentLines, f.BlankLines, ratio, f.AvgLineLength))
+
+		// 如果不是最后一个文件，添加逗号
+		if i < len(stats.FileStats)-1 {
+			sb.WriteString(",\n")
+		} else {
+			sb.WriteString("\n")
+		}
+	}
+
+	sb.WriteString(`        };
+        
+        // 构建目录树结构
+        function buildDirectoryTree() {
+            const root = { name: "根目录", isDirectory: true, children: {} };
+            
+            // 处理每个文件路径
+            Object.keys(fileData).forEach(path => {
+                const parts = path.split("/");
+                let current = root;
+                
+                // 逐级创建目录结构
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    
+                    // 如果是最后一部分，则为文件
+                    if (i === parts.length - 1) {
+                        if (!current.children[part]) {
+                            current.children[part] = { 
+                                name: part, 
+                                isDirectory: false, 
+                                path: path 
+                            };
+                        }
+                    } else {
+                        // 否则是目录
+                        if (!current.children[part]) {
+                            current.children[part] = { 
+                                name: part, 
+                                isDirectory: true, 
+                                children: {} 
+                            };
+                        }
+                        current = current.children[part];
+                    }
+                }
+            });
+            
+            return root;
+        }
+        
+        // 将目录树渲染为HTML
+        function renderDirectoryTree(node) {
+            if (!node.isDirectory) return "";
+            
+            let html = '<ul>';
+            
+            // 获取目录和文件并排序
+            const items = Object.values(node.children);
+            const directories = items.filter(item => item.isDirectory);
+            const files = items.filter(item => !item.isDirectory);
+            
+            // 按名称排序
+            directories.sort((a, b) => a.name.localeCompare(b.name));
+            files.sort((a, b) => a.name.localeCompare(b.name));
+            
+            // 先渲染目录
+            directories.forEach(dir => {
+                html += '<li class="directory-item collapsed">' +
+                        '<span class="directory">' + dir.name + '</span>' +
+                        renderDirectoryTree(dir) +
+                        '</li>';
+            });
+            
+            // 再渲染文件
+            files.forEach(file => {
+                html += '<li><span class="file" data-path="' + file.path + '">' + file.name + '</span></li>';
+            });
+            
+            html += '</ul>';
+            return html;
+        }
+        
+        // 显示文件详情
+        function showFileDetails(path) {
+            const file = fileData[path];
+            if (!file) return;
+            
+            let html = '<h3>' + path + '</h3>';
+            
+            html += '<div class="info-group">' +
+                    '<span class="info-label">语言:</span>' + file.language + 
+                    '<span class="info-label" style="margin-left:20px;">扩展名:</span>' + file.extension + 
+                    '</div>';
+            
+            html += '<div class="metrics">';
+            
+            // 文件大小指标
+            html += '<div class="metric-box">' +
+                    '<div class="metric-value">' + file.size.toFixed(2) + ' KB</div>' +
+                    '<div class="metric-name">文件大小</div>' +
+                    '</div>';
+            
+            // 总行数指标
+            html += '<div class="metric-box">' +
+                    '<div class="metric-value">' + file.totalLines + '</div>' +
+                    '<div class="metric-name">总行数</div>' +
+                    '</div>';
+            
+            // 代码行指标
+            html += '<div class="metric-box">' +
+                    '<div class="metric-value">' + file.codeLines + '</div>' +
+                    '<div class="metric-name">代码行</div>' +
+                    '</div>';
+            
+            // 注释行指标
+            html += '<div class="metric-box">' +
+                    '<div class="metric-value">' + file.commentLines + '</div>' +
+                    '<div class="metric-name">注释行</div>' +
+                    '</div>';
+            
+            // 空白行指标
+            html += '<div class="metric-box">' +
+                    '<div class="metric-value">' + file.blankLines + '</div>' +
+                    '<div class="metric-name">空白行</div>' +
+                    '</div>';
+            
+            // 注释比例指标
+            html += '<div class="metric-box">' +
+                    '<div class="metric-value">' + file.commentRatio.toFixed(2) + '</div>' +
+                    '<div class="metric-name">注释比例</div>' +
+                    '</div>';
+            
+            // 平均行长指标
+            html += '<div class="metric-box">' +
+                    '<div class="metric-value">' + file.avgLineLength.toFixed(1) + '</div>' +
+                    '<div class="metric-name">平均行长度(字符)</div>' +
+                    '</div>';
+            
+            html += '</div>';
+            
+            // 添加文件组成饼图
+            html += '<div class="file-mini-chart">' +
+                    '<canvas id="fileCompositionChart"></canvas>' +
+                    '</div>';
+            
+            document.getElementById('fileDetails').innerHTML = html;
+            
+            // 绘制饼图
+            const ctx = document.getElementById('fileCompositionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['代码行', '注释行', '空白行'],
+                    datasets: [{
+                        data: [file.codeLines, file.commentLines, file.blankLines],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 205, 86, 0.7)',
+                            'rgba(201, 203, 207, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgb(54, 162, 235)',
+                            'rgb(255, 205, 86)',
+                            'rgb(201, 203, 207)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        title: {
+                            display: true,
+                            text: '文件组成'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 当文档加载完成时初始化目录树
+        $(document).ready(function() {
+            const tree = buildDirectoryTree();
+            document.getElementById('fileTree').innerHTML = renderDirectoryTree(tree);
+            
+            // 为目录添加点击事件 - 折叠/展开
+            $(document).on('click', '.directory', function() {
+                const li = $(this).parent();
+                li.toggleClass('collapsed expanded');
+            });
+            
+            // 为文件添加点击事件 - 显示详情
+            $(document).on('click', '.file', function() {
+                const path = $(this).data('path');
+                showFileDetails(path);
+            });
+            
+            // 默认展开根目录
+            $('#fileTree > ul > li').addClass('expanded').removeClass('collapsed');
         });
     </script>
 </body>
