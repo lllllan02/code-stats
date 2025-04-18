@@ -2,6 +2,10 @@ package analyzer
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 // 颜色代码常量
@@ -49,39 +53,145 @@ func PrintWarning(format string, args ...interface{}) {
 	fmt.Printf("%s%s[warning]%s %s%s%s\n", ColorBold, ColorYellow, ColorReset, ColorYellow, message, ColorReset)
 }
 
-// PrintProgress 打印进度日志（彩色进度条）
-func PrintProgress(current, total int) {
-	percent := float64(current) / float64(total) * 100
-	width := 30
-	completed := int(float64(width) * float64(current) / float64(total))
+// ProgressManager 进度条管理器，用于维护进度条实例
+type ProgressManager struct {
+	bars map[string]*progressbar.ProgressBar
+	mu   sync.Mutex
+}
 
-	// 移除方括号边框，使用更干净的设计
-	fmt.Printf("\r%s%s[进度]%s ",
-		ColorBold, ColorLightBlue, ColorReset)
+// NewProgressManager 创建新的进度条管理器
+func NewProgressManager() *ProgressManager {
+	return &ProgressManager{
+		bars: make(map[string]*progressbar.ProgressBar),
+	}
+}
 
-	// 使用单一色系的渐变，颜色更接近
-	for i := 0; i < width; i++ {
-		if i < completed {
-			// 使用单一蓝色系，从深到浅
-			switch {
-			case i < width/5:
-				fmt.Printf("\033[38;5;27m█") // 深蓝色
-			case i < width*2/5:
-				fmt.Printf("\033[38;5;33m█") // 蓝色
-			case i < width*3/5:
-				fmt.Printf("\033[38;5;39m█") // 中蓝色
-			case i < width*4/5:
-				fmt.Printf("\033[38;5;45m█") // 亮蓝色
-			default:
-				fmt.Printf("\033[38;5;51m█") // 浅蓝色
-			}
-		} else {
-			fmt.Printf("%s▒", ColorGray) // 使用更清晰的字符
-		}
+// UpdateProgress 更新指定ID的进度条
+// 如果进度条不存在则创建新的
+func (pm *ProgressManager) UpdateProgress(id string, current, total int, description string) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	bar, exists := pm.bars[id]
+	if !exists {
+		// 创建新的进度条
+		bar = progressbar.NewOptions(total,
+			progressbar.OptionSetDescription(description),
+			progressbar.OptionEnableColorCodes(true),
+			progressbar.OptionShowCount(),
+			progressbar.OptionShowIts(),
+			progressbar.OptionFullWidth(),
+			progressbar.OptionSetTheme(progressbar.Theme{
+				Saucer:        "[cyan]=[reset]",
+				SaucerHead:    "[cyan]>[reset]",
+				SaucerPadding: " ",
+				BarStart:      "[",
+				BarEnd:        "]",
+			}),
+			progressbar.OptionThrottle(65*time.Millisecond), // 限制更新频率
+			progressbar.OptionShowBytes(false),              // 不显示字节数
+			progressbar.OptionSetRenderBlankState(true),     // 确保初始状态也渲染
+			progressbar.OptionSetPredictTime(false),         // 不预测剩余时间
+		)
+		pm.bars[id] = bar
 	}
 
-	// 在进度条后显示数字信息，不使用括号
-	fmt.Printf(" %s%d/%d%s %s%.1f%%%s",
-		ColorBold, current, total, ColorReset,
-		"\033[38;5;51m", percent, ColorReset) // 使用与进度条末端相同的颜色
+	_ = bar.Set(current)
+
+	// 如果完成了，可以从map中删除
+	if current >= total {
+		delete(pm.bars, id)
+	}
+}
+
+// 全局进度条实例，用于单个进度显示的情况
+var (
+	globalBar     *progressbar.ProgressBar
+	globalBarOnce sync.Once
+	globalBarMu   sync.Mutex
+)
+
+// GetGlobalProgressBar 返回全局进度条实例（单例模式）
+func GetGlobalProgressBar(total int, description string) *progressbar.ProgressBar {
+	globalBarMu.Lock()
+	defer globalBarMu.Unlock()
+
+	// 如果已存在且总数相同，直接返回
+	if globalBar != nil && int(globalBar.GetMax()) == total {
+		return globalBar
+	}
+
+	// 创建新的全局进度条
+	globalBar = progressbar.NewOptions(total,
+		progressbar.OptionSetDescription(description),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowCount(),
+		progressbar.OptionShowIts(),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[cyan]=[reset]",
+			SaucerHead:    "[cyan]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}),
+		progressbar.OptionFullWidth(),
+		progressbar.OptionThrottle(65*time.Millisecond),
+		progressbar.OptionShowBytes(false),
+		progressbar.OptionSetRenderBlankState(true),
+		progressbar.OptionSetPredictTime(false),
+	)
+
+	return globalBar
+}
+
+// PrintProgress 使用第三方库打印进度条
+// 现已改名为PrintProgress，替代原有实现
+func PrintProgress(current, total int, description ...string) {
+	desc := "进度"
+	if len(description) > 0 && description[0] != "" {
+		desc = description[0]
+	}
+
+	// 使用全局单例进度条，减少闪烁
+	bar := GetGlobalProgressBar(total, desc)
+
+	// 设置当前进度
+	_ = bar.Set(current)
+
+	// 如果完成，清理进度条（打印换行）
+	if current >= total {
+		bar.Finish()
+		fmt.Println()
+	}
+}
+
+// 为向后兼容保留的旧方法
+func PrintProgressDirect(current, total int, description ...string) {
+	desc := "进度"
+	if len(description) > 0 && description[0] != "" {
+		desc = description[0]
+	}
+
+	// 创建一个进度条实例
+	bar := progressbar.NewOptions(total,
+		progressbar.OptionSetDescription(desc),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionShowCount(),
+		progressbar.OptionShowIts(),
+		progressbar.OptionSetTheme(progressbar.Theme{
+			Saucer:        "[cyan]=[reset]",
+			SaucerHead:    "[cyan]>[reset]",
+			SaucerPadding: " ",
+			BarStart:      "[",
+			BarEnd:        "]",
+		}),
+		progressbar.OptionFullWidth(),
+		progressbar.OptionThrottle(65*time.Millisecond),
+		progressbar.OptionShowBytes(false),
+		progressbar.OptionSetRenderBlankState(true),
+		progressbar.OptionSetPredictTime(false),
+	)
+
+	// 设置当前进度
+	_ = bar.Set(current)
 }

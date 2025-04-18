@@ -99,6 +99,9 @@ func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*Directory
 		processedCnt = 0
 	)
 
+	// 获取全局进度条
+	bar := GetGlobalProgressBar(totalFiles, "分析文件")
+
 	// 启动工作池
 	for i := 0; i < maxWorkers; i++ {
 		wg.Add(1)
@@ -114,7 +117,8 @@ func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*Directory
 				mutex.Lock()
 				res.FileStats = append(res.FileStats, stats)
 				processedCnt++
-				PrintProgress(processedCnt, totalFiles)
+				// 更新进度条
+				_ = bar.Set(processedCnt)
 				mutex.Unlock()
 			}
 		}()
