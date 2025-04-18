@@ -255,159 +255,230 @@
             text-align: center;
             margin-top: 40px;
         }
+
+        /* 导航栏样式 */
+        .nav-container {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 5px;
+        }
+        
+        .nav-item {
+            display: inline-block;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 0 5px;
+            font-weight: bold;
+            color: #2c3e50;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-item.active {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .nav-item:hover:not(.active) {
+            background-color: #e9f7fe;
+        }
+        
+        .section {
+            display: none;
+        }
+        
+        .section.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
-    <h1>代码统计报告</h1>
-    <div class="timestamp">生成时间: {{.GenerationTime}}</div>
-    <div class="path-info">分析路径: {{.Stats.Path}}</div>
-
-    <h2>总体摘要</h2>
-    <div class="summary">
-        <div class="summary-item"><span class="summary-label">总文件数:</span> {{.Stats.TotalFiles}} 个文件</div>
-        <div class="summary-item"><span class="summary-label">总代码量:</span> {{.Stats.TotalLines}} 行 ({{printf "%.2f" (divideBy .Stats.TotalSize 1048576)}} MB)</div>
-        <div class="summary-item"><span class="summary-label">代码行数:</span> {{.Stats.CodeLines}} 行 ({{printf "%.1f%%" (multiply .Stats.CodeDensity 100)}})</div>
-        <div class="summary-item"><span class="summary-label">注释行数:</span> {{.Stats.CommentLines}} 行 ({{printf "%.1f%%" (multiply .Stats.CommentDensity 100)}})</div>
-        <div class="summary-item"><span class="summary-label">空白行数:</span> {{.Stats.BlankLines}} 行 ({{printf "%.1f%%" (multiply .Stats.AvgBlankLines 100)}})</div>
-        <div class="summary-item"><span class="summary-label">注释比例:</span> {{printf "%.2f" .Stats.CommentRatio}} (注释行/代码行)</div>
-        <div class="summary-item"><span class="summary-label">平均文件大小:</span> {{printf "%.2f" (divideBy .Stats.AvgFileSize 1024)}} KB</div>
-        <div class="summary-item"><span class="summary-label">平均行长度:</span> {{printf "%.1f" .Stats.AvgLineLength}} 字符/行</div>
-    </div>
-
-    <!-- 可视化图表 -->
-    <div class="chart-container">
-        <div class="chart">
-            <h3>代码组成</h3>
-            <div style="position: relative; height: 200px;">
-                <canvas id="compositionChart"></canvas>
-            </div>
-        </div>
-        <div class="chart">
-            <h3>语言分布</h3>
-            <div style="position: relative; height: 200px;">
-                <canvas id="languageChart"></canvas>
-            </div>
+    <div style="position: relative; margin-bottom: 0;">
+        <h1 style="margin-bottom: 0; padding-bottom: 10px;">代码统计报告</h1>
+        <div style="position: absolute; right: 0; bottom: 15px; text-align: right; font-size: 0.9em;">
+            <span class="timestamp">生成时间: {{.GenerationTime}}</span> | 
+            <span class="path-info">分析路径: {{.Stats.Path}}</span>
         </div>
     </div>
 
-    {{if gt (len .TopLanguages) 0}}
-    <h2>各语言统计</h2>
-    <table id="language-table" class="display">
-        <thead>
-            <tr>
-                <th>语言</th>
-                <th>文件数</th>
-                <th>代码行</th>
-                <th>注释行</th>
-                <th>空白行</th>
-                <th>注释比例</th>
-                <th>平均行长度</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{range .TopLanguages}}
-            {{if ne .Name ""}}
-            <tr>
-                <td>{{.Name}}</td>
-                <td>{{.Stats.TotalFiles}}</td>
-                <td>{{.Stats.CodeLines}}</td>
-                <td>{{.Stats.CommentLines}}</td>
-                <td>{{.Stats.BlankLines}}</td>
-                <td>{{printf "%.2f" .Stats.CommentRatio}}</td>
-                <td>{{printf "%.1f" .Stats.AvgLineLength}}</td>
-            </tr>
-            {{end}}
-            {{end}}
-        </tbody>
-    </table>
-    {{end}}
+    <!-- 导航栏 -->
+    <div class="nav-container" style="margin-top: 0; border-top: 2px solid #3498db;">
+        <div class="nav-item active" data-target="section-summary">总体摘要</div>
+        <div class="nav-item" data-target="section-languages">语言统计</div>
+        <div class="nav-item" data-target="section-extensions">扩展名统计</div>
+        <div class="nav-item" data-target="section-files-size">最大文件</div>
+        <div class="nav-item" data-target="section-files-lines">最长文件</div>
+        <div class="nav-item" data-target="section-file-browser">文件浏览器</div>
+    </div>
 
-    {{if gt (len .SortedExts) 0}}
-    <h2>各扩展名统计</h2>
-    <table id="extension-table" class="display">
-        <thead>
-            <tr>
-                <th>扩展名</th>
-                <th>文件数</th>
-                <th>代码行</th>
-                <th>总行数</th>
-                <th>平均大小(KB)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{range .SortedExts}}
-            <tr>
-                <td>{{.Name}}</td>
-                <td>{{.Stats.TotalFiles}}</td>
-                <td>{{.Stats.CodeLines}}</td>
-                <td>{{.Stats.TotalLines}}</td>
-                <td>{{printf "%.2f" (divideBy .Stats.AvgFileSize 1024)}}</td>
-            </tr>
-            {{end}}
-        </tbody>
-    </table>
-    {{end}}
-
-    {{if gt (len .FilesBySize) 0}}
-    <h2>文件统计（按大小排序前{{.TopN}}）</h2>
-    <table id="files-by-size-table" class="display">
-        <thead>
-            <tr>
-                <th>文件路径</th>
-                <th>大小(KB)</th>
-                <th>总行数</th>
-                <th>代码行</th>
-                <th>注释行</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{range .FilesBySize}}
-            <tr>
-                <td>{{.Path}}</td>
-                <td>{{printf "%.2f" (divideBy .TotalSize 1024)}}</td>
-                <td>{{.TotalLines}}</td>
-                <td>{{.CodeLines}}</td>
-                <td>{{.CommentLines}}</td>
-            </tr>
-            {{end}}
-        </tbody>
-    </table>
-
-    <h2>文件统计（按代码行数排序前{{.TopN}}）</h2>
-    <table id="files-by-lines-table" class="display">
-        <thead>
-            <tr>
-                <th>文件路径</th>
-                <th>代码行</th>
-                <th>注释行</th>
-                <th>空白行</th>
-                <th>注释比例</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{range .FilesByLines}}
-            <tr>
-                <td>{{.Path}}</td>
-                <td>{{.CodeLines}}</td>
-                <td>{{.CommentLines}}</td>
-                <td>{{.BlankLines}}</td>
-                <td>{{printf "%.2f" (commentRatio .CommentLines .CodeLines)}}</td>
-            </tr>
-            {{end}}
-        </tbody>
-    </table>
-    {{end}}
-
-    <h2>文件浏览器</h2>
-    <p>点击目录树中的文件可查看详细信息</p>
-    
-    <div class="file-browser-container">
-        <div class="directory-tree">
-            <div class="treeview" id="fileTree"></div>
+    <!-- 总体摘要区域 -->
+    <div id="section-summary" class="section active">
+        <div class="summary">
+            <div class="summary-item"><span class="summary-label">总文件数:</span> {{.Stats.TotalFiles}} 个文件</div>
+            <div class="summary-item"><span class="summary-label">总代码量:</span> {{.Stats.TotalLines}} 行 ({{printf "%.2f" (divideBy .Stats.TotalSize 1048576)}} MB)</div>
+            <div class="summary-item"><span class="summary-label">代码行数:</span> {{.Stats.CodeLines}} 行 ({{printf "%.1f%%" (multiply .Stats.CodeDensity 100)}})</div>
+            <div class="summary-item"><span class="summary-label">注释行数:</span> {{.Stats.CommentLines}} 行 ({{printf "%.1f%%" (multiply .Stats.CommentDensity 100)}})</div>
+            <div class="summary-item"><span class="summary-label">空白行数:</span> {{.Stats.BlankLines}} 行 ({{printf "%.1f%%" (multiply .Stats.AvgBlankLines 100)}})</div>
+            <div class="summary-item"><span class="summary-label">注释比例:</span> {{printf "%.2f" .Stats.CommentRatio}} (注释行/代码行)</div>
+            <div class="summary-item"><span class="summary-label">平均文件大小:</span> {{printf "%.2f" (divideBy .Stats.AvgFileSize 1024)}} KB</div>
+            <div class="summary-item"><span class="summary-label">平均行长度:</span> {{printf "%.1f" .Stats.AvgLineLength}} 字符/行</div>
         </div>
-        <div class="file-details" id="fileDetails">
-            <div class="no-file-selected">
-                <p>请从左侧目录树中选择一个文件查看详情</p>
+
+        <!-- 可视化图表 -->
+        <div class="chart-container">
+            <div class="chart">
+                <h3>代码组成</h3>
+                <div style="position: relative; height: 200px;">
+                    <canvas id="compositionChart"></canvas>
+                </div>
+            </div>
+            <div class="chart">
+                <h3>语言分布</h3>
+                <div style="position: relative; height: 200px;">
+                    <canvas id="languageChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 语言统计区域 -->
+    <div id="section-languages" class="section">
+        {{if gt (len .TopLanguages) 0}}
+        <table id="language-table" class="display">
+            <thead>
+                <tr>
+                    <th>语言</th>
+                    <th>文件数</th>
+                    <th>代码行</th>
+                    <th>注释行</th>
+                    <th>空白行</th>
+                    <th>注释比例</th>
+                    <th>平均行长度</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .TopLanguages}}
+                {{if ne .Name ""}}
+                <tr>
+                    <td>{{.Name}}</td>
+                    <td>{{.Stats.TotalFiles}}</td>
+                    <td>{{.Stats.CodeLines}}</td>
+                    <td>{{.Stats.CommentLines}}</td>
+                    <td>{{.Stats.BlankLines}}</td>
+                    <td>{{printf "%.2f" .Stats.CommentRatio}}</td>
+                    <td>{{printf "%.1f" .Stats.AvgLineLength}}</td>
+                </tr>
+                {{end}}
+                {{end}}
+            </tbody>
+        </table>
+        {{end}}
+    </div>
+
+    <!-- 扩展名统计区域 -->
+    <div id="section-extensions" class="section">
+        {{if gt (len .SortedExts) 0}}
+        <table id="extension-table" class="display">
+            <thead>
+                <tr>
+                    <th>扩展名</th>
+                    <th>文件数</th>
+                    <th>代码行</th>
+                    <th>总行数</th>
+                    <th>平均大小(KB)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .SortedExts}}
+                <tr>
+                    <td>{{.Name}}</td>
+                    <td>{{.Stats.TotalFiles}}</td>
+                    <td>{{.Stats.CodeLines}}</td>
+                    <td>{{.Stats.TotalLines}}</td>
+                    <td>{{printf "%.2f" (divideBy .Stats.AvgFileSize 1024)}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{end}}
+    </div>
+
+    <!-- 按大小排序的文件区域 -->
+    <div id="section-files-size" class="section">
+        {{if gt (len .FilesBySize) 0}}
+        <table id="files-by-size-table" class="display">
+            <thead>
+                <tr>
+                    <th>文件路径</th>
+                    <th>大小(KB)</th>
+                    <th>总行数</th>
+                    <th>代码行</th>
+                    <th>注释行</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .FilesBySize}}
+                <tr>
+                    <td>{{.Path}}</td>
+                    <td>{{printf "%.2f" (divideBy .TotalSize 1024)}}</td>
+                    <td>{{.TotalLines}}</td>
+                    <td>{{.CodeLines}}</td>
+                    <td>{{.CommentLines}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{end}}
+    </div>
+
+    <!-- 按代码行数排序的文件区域 -->
+    <div id="section-files-lines" class="section">
+        {{if gt (len .FilesByLines) 0}}
+        <table id="files-by-lines-table" class="display">
+            <thead>
+                <tr>
+                    <th>文件路径</th>
+                    <th>代码行</th>
+                    <th>注释行</th>
+                    <th>空白行</th>
+                    <th>注释比例</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .FilesByLines}}
+                <tr>
+                    <td>{{.Path}}</td>
+                    <td>{{.CodeLines}}</td>
+                    <td>{{.CommentLines}}</td>
+                    <td>{{.BlankLines}}</td>
+                    <td>{{printf "%.2f" (commentRatio .CommentLines .CodeLines)}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{end}}
+    </div>
+
+    <!-- 文件浏览器区域 -->
+    <div id="section-file-browser" class="section">
+        <p>点击目录树中的文件可查看详细信息</p>
+        
+        <div class="file-browser-container">
+            <div class="directory-tree">
+                <div class="treeview" id="fileTree"></div>
+            </div>
+            <div class="file-details" id="fileDetails">
+                <div class="no-file-selected">
+                    <p>请从左侧目录树中选择一个文件查看详情</p>
+                </div>
             </div>
         </div>
     </div>
@@ -427,6 +498,22 @@
                     // 为表格行添加统一样式
                     $(row).addClass('unified-row');
                 }
+            });
+            
+            // 导航栏切换功能
+            $('.nav-item').click(function() {
+                // 移除所有导航项的active类
+                $('.nav-item').removeClass('active');
+                // 为当前点击的导航项添加active类
+                $(this).addClass('active');
+                
+                // 获取目标部分的ID
+                const targetId = $(this).data('target');
+                
+                // 隐藏所有部分
+                $('.section').removeClass('active');
+                // 显示目标部分
+                $('#' + targetId).addClass('active');
             });
         });
         
