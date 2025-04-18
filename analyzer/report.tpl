@@ -148,8 +148,26 @@
             min-width: 250px;
             padding: 15px;
             border-right: 1px solid #eee;
-            overflow: auto;
+            overflow-y: auto;
+            overflow-x: hidden;
             height: 100%;
+            max-height: 700px;
+            scrollbar-width: thin; /* Firefox */
+            scrollbar-color: #ccc #f8f9fa; /* Firefox */
+        }
+        
+        /* WebKit 滚动条样式 */
+        .directory-tree::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .directory-tree::-webkit-scrollbar-track {
+            background: #f8f9fa;
+        }
+        
+        .directory-tree::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 20px;
         }
         
         .file-details {
@@ -162,34 +180,59 @@
         /* 目录树样式 */
         .treeview {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            position: relative;
+            width: 100%;
         }
         
         .treeview ul {
             list-style: none;
             padding-left: 20px;
+            margin: 0;
         }
         
         .treeview li {
             margin: 5px 0;
+            position: relative;
         }
         
         .directory-item {
             position: relative;
+            width: 100%;
         }
         
         .treeview .directory {
             cursor: pointer;
             font-weight: bold;
             color: #2c3e50;
+            display: inline-block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 90%;
         }
         
         .treeview .file {
             cursor: pointer;
             color: #3498db;
+            display: inline-block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 90%;
         }
         
         .treeview .file:hover {
             text-decoration: underline;
+        }
+        
+        /* 选中文件的样式 */
+        .treeview .file.selected {
+            font-weight: bold;
+            color: #2980b9;
+            background-color: rgba(52, 152, 219, 0.1);
+            border-radius: 3px;
+            padding: 2px 5px;
+            margin: -2px 0;
         }
         
         .treeview .collapsed > ul {
@@ -202,14 +245,38 @@
         
         .treeview .directory:before {
             content: "📁 ";
+            margin-right: 3px;
         }
         
         .treeview .expanded > .directory:before {
             content: "📂 ";
+            margin-right: 3px;
         }
         
         .treeview .file:before {
             content: "📄 ";
+            margin-right: 3px;
+        }
+        
+        /* 添加展开/折叠指示器 */
+        .directory-item.collapsed:after {
+            content: "+";
+            position: absolute;
+            right: 10px;
+            top: 2px;
+            font-size: 14px;
+            color: #999;
+            font-weight: bold;
+        }
+        
+        .directory-item.expanded:after {
+            content: "-";
+            position: absolute;
+            right: 10px;
+            top: 2px;
+            font-size: 14px;
+            color: #999;
+            font-weight: bold;
         }
         
         /* 文件详情样式 */
@@ -743,15 +810,18 @@
             
             // 先渲染目录
             directories.forEach(dir => {
+                // 添加 title 属性以显示完整名称
                 html += '<li class="directory-item collapsed">' +
-                        '<span class="directory">' + dir.name + '</span>' +
+                        '<span class="directory" title="' + dir.name + '">' + dir.name + '</span>' +
                         renderDirectoryTree(dir) +
                         '</li>';
             });
             
             // 再渲染文件
             files.forEach(file => {
-                html += '<li><span class="file" data-path="' + file.path + '">' + file.name + '</span></li>';
+                // 同样添加 title 属性
+                html += '<li><span class="file" data-path="' + file.path + '" title="' + file.name + '">' + 
+                        file.name + '</span></li>';
             });
             
             html += '</ul>';
@@ -879,15 +949,35 @@
             document.getElementById('fileTree').innerHTML = renderDirectoryTree(tree);
             
             // 为目录添加点击事件 - 折叠/展开
-            $(document).on('click', '.directory', function() {
+            $(document).on('click', '.directory', function(e) {
+                e.stopPropagation(); // 防止事件冒泡
                 const li = $(this).parent();
                 li.toggleClass('collapsed expanded');
+                
+                // 当展开目录时，确保目录树可以滚动
+                if (li.hasClass('expanded')) {
+                    setTimeout(function() {
+                        // 滚动到可视区域
+                        const container = $('.directory-tree');
+                        const position = li.position().top;
+                        if (position < 0 || position > container.height()) {
+                            container.animate({
+                                scrollTop: container.scrollTop() + position - 50
+                            }, 200);
+                        }
+                    }, 100);
+                }
             });
             
             // 为文件添加点击事件 - 显示详情
-            $(document).on('click', '.file', function() {
+            $(document).on('click', '.file', function(e) {
+                e.stopPropagation(); // 防止事件冒泡
                 const path = $(this).data('path');
                 showFileDetails(path);
+                
+                // 高亮当前选中的文件
+                $('.file').removeClass('selected');
+                $(this).addClass('selected');
             });
             
             // 默认展开根目录
