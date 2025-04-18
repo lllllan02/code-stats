@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>代码统计报告</title>
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -323,6 +325,7 @@
         
         .file-mini-chart {
             margin-top: 20px;
+            position: relative;
             height: 200px;
         }
         
@@ -375,6 +378,145 @@
         .section.active {
             display: block;
         }
+
+        /* 贡献者详细统计样式 */
+        .contributor-details-cards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .contributor-card {
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            width: 100%;
+        }
+        .contributor-card h4 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .contributor-email {
+            font-weight: normal;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        .contributor-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin: 15px 0;
+        }
+        .contributor-metric {
+            text-align: center;
+            width: 30%;
+            margin-bottom: 15px;
+        }
+        .metric-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .metric-name {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        .contributor-dates {
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+        .date-label {
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+        @media (max-width: 768px) {
+            .contributor-card {
+                width: 100%;
+            }
+        }
+        
+        /* 贡献者看板特有样式 */
+        .contributor-dashboard {
+            margin-bottom: 30px;
+            overflow-x: auto; /* 添加横向滚动 */
+        }
+        
+        .contributor-row-chart {
+            height: 50px;
+            margin-top: 10px;
+        }
+        
+        .contributor-highlight {
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .contribution-ratio {
+            height: 8px;
+            background-color: #eee;
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        
+        .contribution-ratio-bar {
+            height: 100%;
+            background-color: #3498db;
+        }
+        
+        /* 增强的贡献者表格样式 */
+        .contributor-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        #contributor-details-dashboard {
+            width: 100% !important;
+            table-layout: auto;
+        }
+        
+        /* 确保DataTables容器不溢出 */
+        .dataTables_wrapper {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* 移动设备适配 */
+        @media (max-width: 767px) {
+            .contributor-dashboard {
+                margin: 0 -15px; /* 负边距以扩展到容器外 */
+                padding: 0 15px; /* 内边距恢复内容区域 */
+                width: calc(100% + 30px); /* 增大宽度 */
+            }
+            
+            #contributor-details-dashboard {
+                font-size: 0.9em; /* 稍微减小字体 */
+            }
+            
+            #contributor-details-dashboard th,
+            #contributor-details-dashboard td {
+                padding: 8px 10px; /* 减小内边距 */
+                white-space: nowrap; /* 禁止文本换行 */
+            }
+        }
+        
+        #contributor-details-dashboard th {
+            white-space: nowrap;
+            padding: 12px 15px;
+        }
+        
+        #contributor-details-dashboard td {
+            padding: 10px 15px;
+            vertical-align: middle;
+        }
+        
+        #contributor-details-dashboard tbody tr:hover {
+            background-color: #edf7fd !important;
+        }
     </style>
 </head>
 <body>
@@ -395,6 +537,7 @@
         <div class="nav-item" data-target="section-files-lines">最长文件</div>
         {{if .HasGitStats}}
         <div class="nav-item" data-target="section-git-stats">Git 统计</div>
+        <div class="nav-item" data-target="section-contributors">贡献者看板</div>
         {{end}}
         <div class="nav-item" data-target="section-file-browser">文件浏览器</div>
     </div>
@@ -484,6 +627,73 @@
                 </div>
             </div>
         </div>
+    </div>
+    {{end}}
+
+    <!-- 贡献者看板区域 -->
+    {{if .HasGitStats}}
+    <div id="section-contributors" class="section">
+        <div class="summary">
+            <h3>贡献者统计总览</h3>
+            <div class="summary-item"><span class="summary-label">贡献者总数:</span> {{.Stats.GitStats.ContributorCount}} 人</div>
+            <div class="summary-item"><span class="summary-label">总提交次数:</span> {{.Stats.GitStats.CommitCount}} 次</div>
+            <div class="summary-item"><span class="summary-label">代码变更总计:</span> +{{.Stats.GitStats.TotalAdditions}}行 / -{{.Stats.GitStats.TotalDeletions}}行</div>
+        </div>
+
+        <!-- 贡献者图表概览 -->
+        <div class="chart-container">
+            <div class="chart">
+                <h3>贡献者提交分布</h3>
+                <div style="position: relative; height: 200px;">
+                    <canvas id="contributorsPieChart"></canvas>
+                </div>
+            </div>
+            <div class="chart">
+                <h3>贡献者代码量对比</h3>
+                <div style="position: relative; height: 200px;">
+                    <canvas id="contributorsBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 贡献者详细统计 -->
+        {{if .ContributorStats}}
+        <div class="contributor-dashboard">
+            <h3>贡献者详细统计</h3>
+            <table id="contributor-details-dashboard" class="display nowrap" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>贡献者</th>
+                        <th>邮箱</th>
+                        <th>提交数</th>
+                        <th>添加行数</th>
+                        <th>删除行数</th>
+                        <th>修改文件数</th>
+                        <th>活跃天数</th>
+                        <th>首次提交</th>
+                        <th>最后提交</th>
+                        <th>平均添加/提交</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .ContributorStats}}
+                    <tr>
+                        <td data-order="{{.CommitCount}}"><span class="contributor-name">{{.Name}}</span></td>
+                        <td>{{.Email}}</td>
+                        <td>{{.CommitCount}}</td>
+                        <td>{{.Additions}}</td>
+                        <td>{{.Deletions}}</td>
+                        <td>{{.FileChanges}}</td>
+                        <td>{{.ActiveDays}}</td>
+                        <td>{{formatDate .FirstCommit}}</td>
+                        <td>{{formatDate .LastCommit}}</td>
+                        <td>{{printf "%.1f" (divideBy .Additions .CommitCount)}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{end}}
     </div>
     {{end}}
 
@@ -666,6 +876,13 @@
                 if (targetId === 'section-git-stats') {
                     setTimeout(function() {
                         initGitCharts();
+                    }, 100);
+                }
+                
+                // 如果切换到贡献者看板页面，重新初始化图表
+                if (targetId === 'section-contributors') {
+                    setTimeout(function() {
+                        initContributorsDashboard();
                     }, 100);
                 }
             });
@@ -1000,6 +1217,48 @@
             // 初始化Git统计图表
             initGitCharts();
             
+            // 初始化贡献者看板表格
+            if (document.getElementById('contributor-details-dashboard') && !$.fn.dataTable.isDataTable('#contributor-details-dashboard')) {
+                $('#contributor-details-dashboard').DataTable({
+                    paging: false,
+                    searching: true,
+                    info: true,
+                    order: [[2, 'desc']], // 默认按提交数排序
+                    stripeClasses: [],
+                    scrollX: true, // 启用水平滚动
+                    responsive: {
+                        details: {
+                            display: $.fn.dataTable.Responsive.display.childRowImmediate,
+                            type: 'none',
+                            target: ''
+                        }
+                    },
+                    autoWidth: false, // 禁用自动宽度计算
+                    language: {
+                        info: "共 _TOTAL_ 位贡献者",
+                        infoEmpty: "无贡献者数据",
+                        search: "搜索贡献者: ",
+                        zeroRecords: "没有找到匹配的贡献者"
+                    },
+                    columnDefs: [
+                        { type: 'natural', targets: [2, 3, 4, 5, 6] }, // 数字列使用自然排序
+                        { type: 'date', targets: [7, 8] }, // 日期列使用日期排序
+                        { width: "15%", targets: 0 }, // 设置贡献者名称列宽
+                        { width: "15%", targets: 1 }, // 设置邮箱列宽
+                        { width: "7%", targets: [2, 3, 4, 5, 6, 9] }, // 设置数字列宽
+                        { width: "8%", targets: [7, 8] },  // 设置日期列宽
+                        // 响应式设置 - 在小屏幕上隐藏的列
+                        { responsivePriority: 1, targets: [0, 2] }, // 高优先级保留列
+                        { responsivePriority: 2, targets: [3, 8] },
+                        { responsivePriority: 3, targets: [7, 9, 5] },
+                        { responsivePriority: 10, targets: [1, 4, 6] } // 低优先级列，最先隐藏
+                    ]
+                });
+            }
+            
+            // 初始化贡献者看板图表
+            initContributorsDashboard();
+            
             // 页面加载完成后，再次尝试初始化文件浏览器
             // 这是为了解决某些浏览器中文件树不显示的问题
             setTimeout(function() {
@@ -1124,6 +1383,120 @@
             }
             {{end}}
         }
+
+        // 初始化贡献者看板图表
+        function initContributorsDashboard() {
+            {{if .HasGitStats}}
+            // 检查图表元素是否存在
+            const contributorsPieChartEl = document.getElementById('contributorsPieChart');
+            const contributorsBarChartEl = document.getElementById('contributorsBarChart');
+            
+            if (contributorsPieChartEl) {
+                const existingChart = Chart.getChart(contributorsPieChartEl);
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+                
+                // 贡献者提交分布饼图
+                const pieCtx = contributorsPieChartEl.getContext('2d');
+                new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: [{{range $i, $contributor := .ContributorStats}}{{if $i}}, {{end}}'{{$contributor.Name}}'{{end}}],
+                        datasets: [{
+                            data: [{{range $i, $contributor := .ContributorStats}}{{if $i}}, {{end}}{{$contributor.CommitCount}}{{end}}],
+                            backgroundColor: [
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(255, 99, 132, 0.7)',
+                                'rgba(255, 205, 86, 0.7)',
+                                'rgba(75, 192, 192, 0.7)',
+                                'rgba(153, 102, 255, 0.7)',
+                                'rgba(255, 159, 64, 0.7)',
+                                'rgba(201, 203, 207, 0.7)',
+                                'rgba(52, 73, 94, 0.7)',
+                                'rgba(26, 188, 156, 0.7)',
+                                'rgba(241, 196, 15, 0.7)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    boxWidth: 12,
+                                    font: {
+                                        size: 10
+                                    }
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: '贡献者提交占比分布'
+                            }
+                        }
+                    }
+                });
+            }
+            
+            if (contributorsBarChartEl) {
+                const existingChart = Chart.getChart(contributorsBarChartEl);
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+                
+                // 贡献者代码量对比
+                const barCtx = contributorsBarChartEl.getContext('2d');
+                new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [{{range $i, $contributor := .ContributorStats}}{{if $i}}, {{end}}'{{$contributor.Name}}'{{end}}],
+                        datasets: [
+                            {
+                                label: '添加行数',
+                                data: [{{range $i, $contributor := .ContributorStats}}{{if $i}}, {{end}}{{$contributor.Additions}}{{end}}],
+                                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                                borderColor: 'rgb(75, 192, 192)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: '删除行数',
+                                data: [{{range $i, $contributor := .ContributorStats}}{{if $i}}, {{end}}{{$contributor.Deletions}}{{end}}],
+                                backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                                borderColor: 'rgb(255, 99, 132)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                ticks: {
+                                    font: {
+                                        size: 9
+                                    }
+                                }
+                            },
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top'
+                            }
+                        }
+                    }
+                });
+            }
+            {{end}}
+        }
     </script>
 </body>
 </html>
+

@@ -28,15 +28,30 @@ type ReportData struct {
 	FilesByLines   []*FileStats
 
 	// Git 相关数据
-	HasGitStats       bool              // 是否有 Git 统计信息
-	TopContributors   []ContributorItem // 排名前N的贡献者
-	ContributorsLimit int               // 贡献者数量限制
+	HasGitStats       bool                      // 是否有 Git 统计信息
+	TopContributors   []ContributorItem         // 排名前N的贡献者
+	ContributorStats  []DetailedContributorItem // 贡献者详细统计
+	ContributorsLimit int                       // 贡献者数量限制
 }
 
 // ContributorItem 表示UI显示用的贡献者项
 type ContributorItem struct {
 	Name        string
 	CommitCount int
+}
+
+// DetailedContributorItem 表示UI显示用的详细贡献者统计
+type DetailedContributorItem struct {
+	Name         string
+	Email        string
+	CommitCount  int
+	Additions    int
+	Deletions    int
+	FileChanges  int
+	FirstCommit  time.Time
+	LastCommit   time.Time
+	ActiveDays   int
+	CommitsByDay map[string]int // 按日期统计的提交次数
 }
 
 // DefaultReportData 返回默认的报告数据
@@ -99,6 +114,13 @@ func GenerateHTMLReport(data ReportData) string {
 				return "N/A"
 			}
 			return t.Format("2006-01-02 15:04:05")
+		},
+		// 添加新函数：用于日期转换
+		"formatDate": func(t time.Time) string {
+			if t.IsZero() {
+				return "N/A"
+			}
+			return t.Format("2006-01-02")
 		},
 	}
 
@@ -196,6 +218,31 @@ func GenerateHTMLReport(data ReportData) string {
 			}
 			data.TopContributors = contributors[:limit]
 			data.ContributorsLimit = limit
+		}
+
+		// 处理贡献者详细统计信息
+		if len(stats.GitStats.Contributors) > 0 {
+			detailedContributors := make([]DetailedContributorItem, 0, len(stats.GitStats.Contributors))
+			for _, contributor := range stats.GitStats.Contributors {
+				detailedContributors = append(detailedContributors, DetailedContributorItem{
+					Name:         contributor.Name,
+					Email:        contributor.Email,
+					CommitCount:  contributor.CommitCount,
+					Additions:    contributor.Additions,
+					Deletions:    contributor.Deletions,
+					FileChanges:  contributor.FileChanges,
+					FirstCommit:  contributor.FirstCommit,
+					LastCommit:   contributor.LastCommit,
+					ActiveDays:   contributor.ActiveDays,
+					CommitsByDay: contributor.CommitsByDay,
+				})
+			}
+			// 按提交数排序
+			sort.Slice(detailedContributors, func(i, j int) bool {
+				return detailedContributors[i].CommitCount > detailedContributors[j].CommitCount
+			})
+
+			data.ContributorStats = detailedContributors
 		}
 	}
 
