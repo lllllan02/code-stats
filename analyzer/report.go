@@ -13,30 +13,29 @@ import (
 	"github.com/spf13/cast"
 )
 
-// ReportOptions 配置报告生成的选项
-type ReportOptions struct {
-	OutputFile string // 输出文件路径，为空则不输出到文件
-}
-
-// DefaultReportOptions 返回默认报告选项
-func DefaultReportOptions() ReportOptions {
-	return ReportOptions{
-		OutputFile: "code-stats-report.html",
-	}
-}
-
 // ReportData 包含报告所需的所有数据
 type ReportData struct {
-	Stats          *DirectoryStats
-	Options        ReportOptions
-	GenerationTime string
+	TopN           int             // 显示的文件数量
+	OutputFile     string          // 输出文件
+	GenerationTime string          // 生成时间
+	Stats          *DirectoryStats // 统计数据
+
+	FileSizesLimit int
+	FileLinesLimit int
 	TopLanguages   []LanguageItem
 	SortedExts     []ExtensionItem
 	FilesBySize    []*FileStats
 	FilesByLines   []*FileStats
-	FileSizesLimit int
-	FileLinesLimit int
-	TopN           int // 添加TopN字段用于模板
+}
+
+// DefaultReportData 返回默认的报告数据
+func DefaultReportData(stats *DirectoryStats) ReportData {
+	return ReportData{
+		Stats:          stats,
+		OutputFile:     "code-stats-report.html",
+		GenerationTime: time.Now().Format("2006-01-02 15:04:05"),
+		TopN:           20, // 默认显示20个文件
+	}
 }
 
 // LanguageItem 表示UI显示用的语言项
@@ -183,14 +182,4 @@ func SaveReportToFile(content string, filePath string) error {
 	}
 
 	return nil
-}
-
-// DefaultReportData 返回默认的报告数据
-func DefaultReportData(stats *DirectoryStats) ReportData {
-	return ReportData{
-		Stats:          stats,
-		Options:        ReportOptions{OutputFile: "code-stats-report.html"},
-		GenerationTime: time.Now().Format("2006-01-02 15:04:05"),
-		TopN:           20, // 默认显示20个文件
-	}
 }

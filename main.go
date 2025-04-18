@@ -87,7 +87,7 @@ func main() {
 
 	// 设置报告数据 - 从默认值开始，然后覆盖需要的字段
 	reportData := analyzer.DefaultReportData(stats)
-	reportData.Options.OutputFile = *outputFlag
+	reportData.OutputFile = *outputFlag
 	reportData.TopN = *topNFlag
 
 	// 生成 HTML 报告
@@ -96,10 +96,10 @@ func main() {
 
 	// 保存报告到文件
 	analyzer.PrintInfo("开始保存报告到文件...")
-	if err := analyzer.SaveReportToFile(report, reportData.Options.OutputFile); err != nil {
+	if err := analyzer.SaveReportToFile(report, reportData.OutputFile); err != nil {
 		analyzer.PrintError("保存报告失败: %v", err)
 		return
 	}
 
-	analyzer.PrintInfo("报告已生成: %s", reportData.Options.OutputFile)
+	analyzer.PrintInfo("报告已生成: %s", reportData.OutputFile)
 }
