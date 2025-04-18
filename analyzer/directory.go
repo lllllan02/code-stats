@@ -22,6 +22,7 @@ type DirectoryAnalyzerOptions struct {
 type DirectoryStats struct {
 	*Stat
 
+	Path           string
 	FileStats      []*FileStats
 	LanguageStats  map[string]*LanguageStats
 	ExtensionStats map[string]*ExtensionStats
@@ -30,6 +31,7 @@ type DirectoryStats struct {
 func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*DirectoryStats, error) {
 	res := &DirectoryStats{
 		Stat:           &Stat{},
+		Path:           path,
 		FileStats:      make([]*FileStats, 0),
 		LanguageStats:  make(map[string]*LanguageStats),
 		ExtensionStats: make(map[string]*ExtensionStats),

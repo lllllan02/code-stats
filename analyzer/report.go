@@ -16,7 +16,6 @@ type ReportOptions struct {
 	ShowExtensions bool   // 是否显示各扩展名统计
 	ShowFiles      bool   // 是否显示文件列表
 	TopN           int    // 显示前N个文件(按大小或行数)
-	OutputFormat   string // 输出格式: "text", "html"
 	OutputFile     string // 输出文件路径，为空则不输出到文件
 }
 
@@ -28,7 +27,6 @@ func DefaultReportOptions() ReportOptions {
 		ShowExtensions: true,
 		ShowFiles:      false,
 		TopN:           10,
-		OutputFormat:   "html",
 		OutputFile:     "code-stats-report.html",
 	}
 }
@@ -123,6 +121,11 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
             font-style: italic;
             margin-bottom: 30px;
         }
+        .path-info {
+            color: #7f8c8d;
+            font-style: italic;
+            margin-bottom: 30px;
+        }
         footer {
             margin-top: 50px;
             padding-top: 20px;
@@ -136,6 +139,7 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
 <body>
     <h1>代码统计报告</h1>
     <div class="timestamp">生成时间: ` + time.Now().Format("2006-01-02 15:04:05") + `</div>
+    <div class="path-info">分析路径: ` + stats.Path + `</div>
 `)
 
 	// 总体摘要
