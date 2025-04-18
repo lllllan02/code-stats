@@ -27,10 +27,9 @@ var (
 	// 是否开启详细日志
 	verboseFlag = flag.Bool("verbose", false, "Show verbose output")
 
-	// 报告相关选项
-	showFilesFlag = flag.Bool("show-files", false, "Show individual files in report")
-	topNFlag      = flag.Int("top", 10, "Show top N files in report")
-	outputFlag    = flag.String("output", "code-stats-report.html", "Output file path for the report")
+	// 报告输出选项
+	outputFlag = flag.String("output", "code-stats-report.html", "Output file path for the report")
+	topNFlag   = flag.Int("top", 20, "Show top N files in report")
 
 	// 帮助信息
 	helpFlag = flag.Bool("help", false, "Show help message")
@@ -54,9 +53,9 @@ func printUsage() {
 	fmt.Println("\n  # 分析指定目录并排除node_modules")
 	fmt.Println("  code-stats -path=/path/to/code -exclude-dirs=node_modules,vendor")
 	fmt.Println("\n  # 生成报告并保存到指定文件")
-	fmt.Println("  code-stats -output=report.html -show-files")
-	fmt.Println("\n  # 只显示前20个最大的文件")
-	fmt.Println("  code-stats -show-files -top=20")
+	fmt.Println("  code-stats -output=report.html")
+	fmt.Println("\n  # 只显示前50个最大的文件")
+	fmt.Println("  code-stats -top=50")
 }
 
 func main() {
@@ -84,25 +83,23 @@ func main() {
 		analyzer.PrintError("分析失败: %v", err)
 		return
 	}
-
 	analyzer.PrintInfo("分析完成!")
 
-	// 设置报告选项
-	reportOptions := analyzer.DefaultReportOptions()
-	reportOptions.ShowFiles = *showFilesFlag
-	reportOptions.TopN = *topNFlag
-	reportOptions.OutputFile = *outputFlag
+	// 设置报告数据 - 从默认值开始，然后覆盖需要的字段
+	reportData := analyzer.DefaultReportData(stats)
+	reportData.Options.OutputFile = *outputFlag
+	reportData.TopN = *topNFlag
 
 	// 生成 HTML 报告
 	analyzer.PrintInfo("开始生成 HTML 报告...")
-	report := analyzer.GenerateHTMLReport(stats, reportOptions)
+	report := analyzer.GenerateHTMLReport(reportData)
 
 	// 保存报告到文件
 	analyzer.PrintInfo("开始保存报告到文件...")
-	if err := analyzer.SaveReportToFile(report, reportOptions.OutputFile); err != nil {
+	if err := analyzer.SaveReportToFile(report, reportData.Options.OutputFile); err != nil {
 		analyzer.PrintError("保存报告失败: %v", err)
 		return
 	}
 
-	analyzer.PrintInfo("报告已生成: %s", reportOptions.OutputFile)
+	analyzer.PrintInfo("报告已生成: %s", reportData.Options.OutputFile)
 }
