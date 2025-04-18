@@ -93,14 +93,12 @@ func main() {
 	reportOptions.TopN = *topNFlag
 	reportOptions.OutputFile = *outputFlag
 
-	// 生成HTML报告
-	report, err := analyzer.GenerateReport(stats, reportOptions)
-	if err != nil {
-		analyzer.PrintError("生成报告失败: %v", err)
-		return
-	}
+	// 生成 HTML 报告
+	analyzer.PrintInfo("开始生成 HTML 报告...")
+	report := analyzer.GenerateHTMLReport(stats, reportOptions)
 
 	// 保存报告到文件
+	analyzer.PrintInfo("开始保存报告到文件...")
 	if err := analyzer.SaveReportToFile(report, reportOptions.OutputFile); err != nil {
 		analyzer.PrintError("保存报告失败: %v", err)
 		return

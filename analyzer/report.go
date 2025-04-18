@@ -42,6 +42,9 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>代码统计报告</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -98,11 +101,43 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
             padding: 10px 15px;
             border-bottom: 1px solid #ddd;
         }
+        tr {
+            background-color: #fff;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
         tr:hover {
-            background-color: #f5f5f5;
+            background-color: #e9f7fe;
         }
         tr:last-child td {
             border-bottom: none;
+        }
+        /* 覆盖DataTables默认样式 */
+        .dataTables_wrapper .dataTables_length, 
+        .dataTables_wrapper .dataTables_filter, 
+        .dataTables_wrapper .dataTables_info, 
+        .dataTables_wrapper .dataTables_processing, 
+        .dataTables_wrapper .dataTables_paginate {
+            color: #333;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current, 
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+            background: #3498db;
+            color: white !important;
+            border: 1px solid #3498db;
+        }
+        table.dataTable.stripe tbody tr.odd, 
+        table.dataTable.display tbody tr.odd {
+            background-color: #fff;
+        }
+        table.dataTable.stripe tbody tr.even, 
+        table.dataTable.display tbody tr.even {
+            background-color: #f8f9fa;
+        }
+        table.dataTable.hover tbody tr:hover, 
+        table.dataTable.display tbody tr:hover {
+            background-color: #e9f7fe;
         }
         .chart-container {
             display: flex;
@@ -179,7 +214,7 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
 	if options.ShowLanguages && len(stats.LanguageStats) > 0 {
 		sb.WriteString(`
     <h2>各语言统计</h2>
-    <table>
+    <table id="language-table" class="display">
         <thead>
             <tr>
                 <th>语言</th>
@@ -236,7 +271,7 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
 	if options.ShowExtensions && len(stats.ExtensionStats) > 0 {
 		sb.WriteString(`
     <h2>各扩展名统计</h2>
-    <table>
+    <table id="extension-table" class="display">
         <thead>
             <tr>
                 <th>扩展名</th>
@@ -288,7 +323,7 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
 		// 按大小排序
 		sb.WriteString(`
     <h2>文件统计（按大小排序前` + fmt.Sprintf("%d", options.TopN) + `）</h2>
-    <table>
+    <table id="files-by-size-table" class="display">
         <thead>
             <tr>
                 <th>文件路径</th>
@@ -331,7 +366,7 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
     </table>
 
     <h2>文件统计（按代码行数排序前` + fmt.Sprintf("%d", options.TopN) + `）</h2>
-    <table>
+    <table id="files-by-lines-table" class="display">
         <thead>
             <tr>
                 <th>文件路径</th>
@@ -383,6 +418,22 @@ func GenerateHTMLReport(stats *DirectoryStats, options ReportOptions) string {
 	sb.WriteString(`
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // 初始化所有DataTable
+        $(document).ready(function() {
+            // 为所有表格启用DataTables排序功能
+            $('table.display').DataTable({
+                paging: false,
+                searching: false,
+                info: false,
+                order: [],  // 保持默认排序
+                stripeClasses: [],  // 禁用交替行类
+                rowCallback: function(row, data) {
+                    // 为表格行添加统一样式
+                    $(row).addClass('unified-row');
+                }
+            });
+        });
+        
         // 代码组成图表
         const compositionCtx = document.getElementById('compositionChart').getContext('2d');
         new Chart(compositionCtx, {
@@ -506,17 +557,5 @@ func SaveReportToFile(content string, filePath string) error {
 		return fmt.Errorf("写入文件失败: %v", err)
 	}
 
-	PrintInfo("报告已保存至: %s", filePath)
 	return nil
-}
-
-// GenerateReport 根据选项生成报告
-func GenerateReport(stats *DirectoryStats, options ReportOptions) (string, error) {
-	content := GenerateHTMLReport(stats, options)
-
-	if err := SaveReportToFile(content, options.OutputFile); err != nil {
-		return content, err
-	}
-
-	return content, nil
 }
