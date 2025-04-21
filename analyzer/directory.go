@@ -46,8 +46,7 @@ func AnalyzeDirectory(path string, options DirectoryAnalyzerOptions) (*Directory
 		return res, fmt.Errorf("不是目录: %s", path)
 	}
 
-	// 始终分析 Git 仓库信息，忽略选项设置
-	PrintInfo("开始分析 Git 仓库信息...")
+	// 始终分析 Git 仓库信息，忽略选项设
 	gitStats, err := AnalyzeGitRepo(path)
 	if err != nil {
 		PrintWarning("Git 仓库分析失败: %v", err)

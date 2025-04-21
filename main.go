@@ -65,7 +65,7 @@ func main() {
 		return
 	}
 
-	analyzer.PrintInfo("开始分析目录: %s", *pathFlag)
+	
 
 	options := analyzer.DefaultOptions()
 	options.MaxWorkers = *maxWorkersFlag
@@ -83,7 +83,7 @@ func main() {
 		analyzer.PrintError("分析失败: %v", err)
 		return
 	}
-	analyzer.PrintInfo("分析完成!")
+	
 
 	// 设置报告数据 - 从默认值开始，然后覆盖需要的字段
 	reportData := analyzer.DefaultReportData(stats)

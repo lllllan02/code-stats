@@ -82,8 +82,8 @@ func (pm *ProgressManager) UpdateProgress(id string, current, total int, descrip
 			progressbar.OptionShowIts(),
 			progressbar.OptionFullWidth(),
 			progressbar.OptionSetTheme(progressbar.Theme{
-				Saucer:        "[cyan]=[reset]",
-				SaucerHead:    "[cyan]>[reset]",
+				Saucer:        "[purple]█[reset]",
+				SaucerHead:    "[purple]█[reset]",
 				SaucerPadding: " ",
 				BarStart:      "[",
 				BarEnd:        "]",

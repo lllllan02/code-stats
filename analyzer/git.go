@@ -55,7 +55,6 @@ func AnalyzeGitRepo(repoPath string) (*GitStats, error) {
 		BranchList:      make(map[string]bool),
 	}
 
-	PrintInfo("开始分析Git仓库...")
 	// 分析步骤总数
 	totalSteps := 6
 	currentStep := 0
@@ -121,7 +120,6 @@ func AnalyzeGitRepo(repoPath string) (*GitStats, error) {
 	// 完成进度条
 	progressBar.Finish()
 	fmt.Println()
-	PrintInfo("Git仓库分析完成")
 
 	// 获取贡献者详细统计信息
 	if err := getDetailedContributorStats(repoPath, stats); err == nil {
@@ -172,7 +170,6 @@ func getDetailedContributorStats(path string, stats *GitStats) error {
 	// 获取每个贡献者的提交统计
 	totalContributors := len(stats.Contributors)
 	currentContributor := 0
-	PrintInfo("开始分析 %d 位贡献者的详细统计信息", totalContributors)
 
 	// 获取贡献者分析进度条
 	contributorProgressBar := GetGlobalProgressBar(totalContributors, "贡献者分析")
@@ -325,8 +322,7 @@ func getDetailedContributorStats(path string, stats *GitStats) error {
 
 	// 完成贡献者分析进度条
 	contributorProgressBar.Finish()
-	fmt.Println()
-	PrintInfo("贡献者详细分析完成")
+	fmt.Println("")
 	return nil
 }
 
